@@ -1,5 +1,6 @@
 **Bitrixdock**
-
+OS: Astra Linux
+Docker Rootless
 Bitrix(php-mysql-nginx) -Traefik-Memcached
 
 **Getting started**
