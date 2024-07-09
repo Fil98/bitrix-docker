@@ -1,0 +1,122 @@
+volumes:
+  db:
+    driver: local
+  cache:
+    driver: local
+# # Поменять сеть на название под проект - net_aoczn
+# networks:
+#   net_aoczn:
+
+services:
+  #PHP
+  php:
+    build: ./${PHP_VERSION}
+    container_name: php_${PROJECT_NAME}
+    volumes_from:
+      - source
+    links:
+      - db
+      - memcached
+    environment:
+      - TZ=Europe/Moscow
+    stdin_open: true
+    tty: true
+    networks:
+      - bitrix
+    restart: unless-stopped
+
+  #Web Server
+  web_server:
+    build: ./${WEB_SERVER_TYPE}
+    container_name: web_server_${PROJECT_NAME}
+    depends_on:
+      - source
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-ssl.rule=Host(`${PROJECT_HOST}`) || Host(`www.${PROJECT_HOST}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-ssl.entrypoints=https"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-ssl.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-ssl.tls.certresolver=${PROJECT_CERT_RESOLVER}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-ssl.middlewares=${PROJECT_SSL_MIDDLEWARES}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${PROJECT_HOST}`) || Host(`www.${PROJECT_HOST}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${PROJECT_MIDDLEWARES}"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=80"
+    volumes_from:
+      - source
+    # ports:
+    #   # - "${INTERFACE}:${WEB_PORT}:80"
+    #   # - "${INTERFACE}:${HTTPS_PORT}:443"
+    links:
+      - php
+    networks:
+      - bitrix
+    environment:
+      - TZ=Europe/Moscow
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  # DB
+  db:
+    build: ./${DB_SERVER_TYPE}
+    container_name: db_${PROJECT_NAME}
+    volumes:
+      - ./${DB_SERVER_TYPE}/init:/docker-entrypoint-initdb.d
+    volumes_from:
+      - source
+    labels:
+      traefik.enable: false
+    # ports:
+    #   - "${INTERFACE}:${DB_PORT}:3306"
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: Europe/Moscow
+    command: mysqld --user=root --sql-mode=""
+    networks:
+      - bitrix
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  #Memcached
+  memcached:
+    image: memcached:latest
+    container_name: memcached_${PROJECT_NAME}
+    volumes_from:
+      - source
+    # ports:
+    #   - "${INTERFACE}:${MEMCACHED_PORT}:3306"
+    labels:
+      traefik.enable: false
+    networks:
+      - bitrix
+    environment:
+      - TZ=Europe/Moscow
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  #Source
+  source:
+    image: alpine:latest
+    container_name: source_${PROJECT_NAME}
+    volumes:
+      - ./logs/${WEB_SERVER_TYPE}:/var/log/${WEB_SERVER_TYPE}
+      - ./logs/php:/var/log/php
+      - ./logs/db:/var/log/mysql
+      - ./logs/memcached:/var/log/memcached
+      - db:/var/lib/mysql
+      - cache:/var/lib/memcached
+      - ${SITE_PATH}:/var/www/bitrix
+      - /etc/localtime:/etc/localtime/:ro
+      - &msmtp-volume ./config/msmtp/msmtprc:/etc/msmtprc
+    networks:
+      - bitrix
+networks:
+  bitrix:
+    external: true
+    name: traefik_bitrix

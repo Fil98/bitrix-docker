@@ -1,0 +1,47 @@
+version: "3"
+
+networks:
+  bitrix:
+    driver: bridge
+
+services:
+  traefik:
+    image: traefik:latest
+    container_name: bitrix-traefik
+    restart: unless-stopped
+    environment:
+      TZ: "${SERVER_TIMEZONE}"
+    #    logging:
+    #      driver: loki
+    #      options:
+    #        loki-url: "http://0.0.0.0:3100/loki/api/v1/push"
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./data/traefik/letsencrypt:/letsencrypt
+      - /run/user/1001/docker.sock:/var/run/docker.sock:ro
+      - ./config/traefik.yml:/traefik.yml:ro
+      - ./config/global/:/global/:ro
+    labels:
+      traefik.enable: true
+
+      traefik.http.routers.traefik-ssl.rule: Host(`traefik.${MAIN_HOST}`) || Host(`www.traefik.${MAIN_HOST}`)
+      traefik.http.routers.traefik-ssl.entrypoints: https
+      traefik.http.routers.traefik-ssl.tls: true
+      traefik.http.routers.traefik-ssl.tls.certresolver: ${TRAEFIK_CERT_RESOLVER}
+      traefik.http.routers.traefik-ssl.middlewares: ${TRAEFIK_SSL_MIDDLEWARES}
+      traefik.http.routers.traefik-ssl.service: api@internal
+
+      traefik.http.routers.traefik.rule: Host(`traefik.${MAIN_HOST}`) || Host(`www.traefik.${MAIN_HOST}`)
+      traefik.http.routers.traefik.entrypoints: http
+      traefik.http.routers.traefik.middlewares: ${TRAEFIK_MIDDLEWARES}
+      traefik.http.routers.traefik.service: api@internal
+
+      traefik.http.middlewares.basic-auth.basicauth.users: "${TRAEFIK_BASIC_AUTH_USERS}"
+
+      traefik.http.services.traefik.loadbalancer.server.port: 80
+    networks:
+      - bitrix
