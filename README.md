@@ -1,8 +1,10 @@
 **Bitrixdock**
+* Fork: https://github.com/bitrixdock/bitrixdock
 
-# OS: Astra Linux
-# Docker Rootless
-# Bitrix(php-mysql-nginx) -Traefik-Memcached
+### Stack
+* OS: Astra Linux
+* Docker Rootless
+* Bitrix(php-mysql-nginx) -Traefik-Memcached
 
 **Getting started**
 
